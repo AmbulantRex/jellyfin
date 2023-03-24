@@ -20,6 +20,7 @@ namespace MediaBrowser.Model.Updates
             Overview = string.Empty;
             Owner = string.Empty;
             Description = string.Empty;
+            Assemblies = Array.Empty<string>();
         }
 
         /// <summary>
@@ -79,5 +80,11 @@ namespace MediaBrowser.Model.Updates
         /// </summary>
         [JsonPropertyName("imageUrl")]
         public string? ImageUrl { get; set; }
+
+        /// <summary>
+        /// Gets or sets the list of assemblies for the package.
+        /// </summary>
+        [JsonPropertyName("assemblies")]
+        public IList<string> Assemblies { get; set; }
     }
 }

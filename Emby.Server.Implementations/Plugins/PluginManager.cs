@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -9,6 +10,8 @@ using System.Runtime.Loader;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
+using Emby.Server.Implementations.Library;
+using Jellyfin.Extensions;
 using Jellyfin.Extensions.Json;
 using Jellyfin.Extensions.Json.Converters;
 using MediaBrowser.Common;
@@ -424,7 +427,8 @@ namespace Emby.Server.Implementations.Plugins
                 Version = versionInfo.Version,
                 Status = status == PluginStatus.Disabled ? PluginStatus.Disabled : PluginStatus.Active, // Keep disabled state.
                 AutoUpdate = true,
-                ImagePath = imagePath
+                ImagePath = imagePath,
+                Assemblies = packageInfo.Assemblies
             };
 
             return SaveManifest(manifest, path);
@@ -688,7 +692,52 @@ namespace Emby.Server.Implementations.Plugins
                 var entry = versions[x];
                 if (!string.Equals(lastName, entry.Name, StringComparison.OrdinalIgnoreCase))
                 {
-                    entry.DllFiles = Directory.GetFiles(entry.Path, "*.dll", SearchOption.AllDirectories);
+                    try
+                    {
+                        if (entry.Manifest.Assemblies.Count > 0)
+                        {
+                            // Load whitelisted DLLs from manifest
+                            var dllFiles = new List<string>();
+                            foreach (var assemblyPath in entry.Manifest.Assemblies)
+                            {
+                                if (assemblyPath.Intersect(Path.GetInvalidPathChars()).Any())
+                                {
+                                    throw new DirectoryTraversalException($"Plugin \"{entry.Name}\" contains assembly path {assemblyPath} which has invalid characters. The plugin will not be loaded.");
+                                }
+
+                                if (Path.GetFileName(assemblyPath).Intersect(Path.GetInvalidFileNameChars()).Any())
+                                {
+                                    throw new DirectoryTraversalException($"Plugin \"{entry.Name}\" contains assembly filename {Path.GetFileName(assemblyPath)} which has invalid characters. The plugin will not be loaded.");
+                                }
+
+                                var combinedPath = Path.GetFullPath(Path.Combine(entry.Path, assemblyPath.Trim())).NormalizePath()!;
+
+                                // Ensure we stay in the plugin directory.
+                                if (!combinedPath.StartsWith(entry.Path.NormalizePath()!, StringComparison.OrdinalIgnoreCase))
+                                {
+                                    throw new DirectoryTraversalException($"Plugin \"{entry.Name}\" contains assembly path {assemblyPath} which attempts to traverse outside the plugin directory. This is considered a security risk. The plugin will not be loaded.");
+                                }
+
+                                dllFiles.Add(combinedPath);
+                            }
+
+                            entry.DllFiles = dllFiles;
+                        }
+                        else
+                        {
+                            // No whitelist specified. Load all DLLs.
+                            entry.DllFiles = Directory.GetFiles(entry.Path, "*.dll", SearchOption.AllDirectories);
+                        }
+                    }
+                    catch (DirectoryTraversalException ex)
+                    {
+#pragma warning disable CA2254 // Template should be a static expression
+                        _logger.LogError(ex, ex.Message);
+#pragma warning restore CA2254 // Template should be a static expression
+
+                        ChangePluginState(entry, PluginStatus.Malfunctioned);
+                    }
+
                     if (entry.IsEnabledAndSupported)
                     {
                         lastName = entry.Name;

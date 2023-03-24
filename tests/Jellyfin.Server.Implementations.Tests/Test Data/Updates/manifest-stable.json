@@ -23,7 +23,8 @@
                 "checksum": "9b1cebff835813e15f414f44b40c41c8",
                 "timestamp": "2020-07-20T01:30:16Z"
             }
-        ]
+        ],
+        "assemblies": [ "Jellyfin.Plugin.Anime.dll" ]
     },
     {
         "guid": "70b7b43b-471b-4159-b4be-56750c795499",

@@ -117,8 +117,8 @@ namespace Jellyfin.Server.Implementations.Tests.Updates
 
             packages = _installationManager.FilterPackages(packages, "Anime").ToArray();
             Assert.Single(packages);
-            Assert.NotEmpty(packages[0].Assemblies);
-            Assert.Equal("Jellyfin.Plugin.Anime.dll", packages[0].Assemblies[0]);
+            Assert.NotEmpty(packages[0].Versions[0].Assemblies);
+            Assert.Equal("Jellyfin.Plugin.Anime.dll", packages[0].Versions[0].Assemblies[0]);
         }
     }
 }

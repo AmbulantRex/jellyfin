@@ -428,7 +428,7 @@ namespace Emby.Server.Implementations.Plugins
                 Status = status == PluginStatus.Disabled ? PluginStatus.Disabled : PluginStatus.Active, // Keep disabled state.
                 AutoUpdate = true,
                 ImagePath = imagePath,
-                Assemblies = packageInfo.Assemblies
+                Assemblies = versionInfo.Assemblies
             };
 
             return SaveManifest(manifest, path);
@@ -696,6 +696,7 @@ namespace Emby.Server.Implementations.Plugins
                     {
                         if (entry.Manifest.Assemblies.Count > 0)
                         {
+                            _logger.LogInformation("Registering whitelisted assemblies for plugin \"{Plugin}\"...", entry.Name);
                             // Load whitelisted DLLs from manifest
                             var dllFiles = new List<string>();
                             foreach (var assemblyPath in entry.Manifest.Assemblies)
@@ -718,7 +719,15 @@ namespace Emby.Server.Implementations.Plugins
                                     throw new DirectoryTraversalException($"Plugin \"{entry.Name}\" contains assembly path {assemblyPath} which attempts to traverse outside the plugin directory. This is considered a security risk. The plugin will not be loaded.");
                                 }
 
-                                dllFiles.Add(combinedPath);
+                                if (!combinedPath.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    _logger.LogWarning("Assembly path {AssemblyPath} is not a DLL file. Skipping.", assemblyPath);
+                                }
+                                else
+                                {
+                                    _logger.LogInformation("Registering assembly path {Path}", combinedPath);
+                                    dllFiles.Add(combinedPath);
+                                }
                             }
 
                             entry.DllFiles = dllFiles;

@@ -105,7 +105,7 @@ namespace Emby.Server.Implementations.Library
                 return false;
             }
 
-            var newSubPathTrimmed = newSubPath.AsSpan().TrimEnd(newDirectorySeparatorChar);
+            var newSubPathTrimmed = newSubPath.AsSpan().TrimEnd((char)newDirectorySeparatorChar!);
             // Ensure that the path with the old subpath removed starts with a leading dir separator
             int idx = oldSubPathEndsWithSeparator ? subPath.Length - 1 : subPath.Length;
             newPath = string.Concat(newSubPathTrimmed, path.AsSpan(idx));
@@ -127,14 +127,14 @@ namespace Emby.Server.Implementations.Library
         /// Normalizes the path's directory separator character.
         /// </summary>
         /// <param name="path">The path to normalize.</param>
-        /// <param name="separator">The separator character the path now uses.</param>
+        /// <param name="separator">The separator character the path now uses or <see langword="null"/>.</param>
         /// <returns>The normalized path string or <see langword="null"/> if the input path is null or empty.</returns>
         public static string? NormalizePath(this string? path, out char separator)
         {
             if (string.IsNullOrEmpty(path))
             {
-                separator = string.Empty[0];
-                return path ?? string.Empty;
+                separator = default;
+                return path;
             }
 
             var newSeparator = '\\';
@@ -156,7 +156,7 @@ namespace Emby.Server.Implementations.Library
         /// Normalizes the path's directory separator character to the specified character.
         /// </summary>
         /// <param name="path">The path to normalize.</param>
-        /// <param name="newSeparator">The replacement directory separator character. Must pass <see cref="char.IsSeparator(char)"/>.</param>
+        /// <param name="newSeparator">The replacement directory separator character. Must be a valid directory separator.</param>
         /// <returns>The normalized path.</returns>
         /// <exception cref="ArgumentException">Thrown if the new separator character is not a directory separator.</exception>
         public static string? NormalizePath(this string? path, char newSeparator)
@@ -171,7 +171,7 @@ namespace Emby.Server.Implementations.Library
 
             if (string.IsNullOrEmpty(path))
             {
-                return path ?? string.Empty;
+                return path;
             }
 
             return newSeparator == Bs ? path?.Replace(Fs, newSeparator) : path?.Replace(Bs, newSeparator);

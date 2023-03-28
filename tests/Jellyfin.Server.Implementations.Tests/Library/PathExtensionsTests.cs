@@ -76,10 +76,13 @@ namespace Jellyfin.Server.Implementations.Tests.Library
         }
 
         [Theory]
+        [InlineData(null, '/', null)]
+        [InlineData(null, '\\', null)]
         [InlineData("/home/jeff/myfile.mkv", '\\', "\\home\\jeff\\myfile.mkv")]
         [InlineData("C:\\Users\\Jeff\\myfile.mkv", '/', "C:/Users/Jeff/myfile.mkv")]
         [InlineData("\\home/jeff\\myfile.mkv", '\\', "\\home\\jeff\\myfile.mkv")]
         [InlineData("\\home/jeff\\myfile.mkv", '/', "/home/jeff/myfile.mkv")]
+        [InlineData("", '/', "")]
         public void NormalizePath_SpecifyingSeparator_Normalizes(string path, char separator, string expectedPath)
         {
             Assert.Equal(expectedPath, path.NormalizePath(separator));
@@ -106,6 +109,12 @@ namespace Jellyfin.Server.Implementations.Tests.Library
 
             Assert.Equal(expectedSeparator, separator);
             Assert.Equal(path.Replace('\\', separator).Replace('/', separator), result);
+        }
+
+        [Fact]
+        public void NormalizePath_SpecifyInvalidSeparator_ThrowsException()
+        {
+            Assert.Throws<ArgumentException>(() => string.Empty.NormalizePath('a'));
         }
     }
 }

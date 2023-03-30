@@ -1,7 +1,9 @@
 using System;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
+using System.Linq;
 using MediaBrowser.Common.Providers;
+using Nikse.SubtitleEdit.Core.Common;
 
 namespace Emby.Server.Implementations.Library
 {
@@ -111,6 +113,16 @@ namespace Emby.Server.Implementations.Library
             newPath = string.Concat(newSubPathTrimmed, path.AsSpan(idx));
 
             return true;
+        }
+
+        /// <summary>
+        /// Retrieves the full resolved path and normalizes path separators to the <see cref="Path.DirectorySeparatorChar"/>.
+        /// </summary>
+        /// <param name="path">The path to canonicalize.</param>
+        /// <returns>The fully expanded, normalized path.</returns>
+        public static string Canonicalize(this string path)
+        {
+            return Path.GetFullPath(path).NormalizePath()!;
         }
 
         /// <summary>

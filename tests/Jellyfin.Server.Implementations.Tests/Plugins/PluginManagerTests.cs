@@ -51,41 +51,28 @@ namespace Jellyfin.Server.Implementations.Tests.Plugins
         /// <summary>
         ///  Tests safe traversal within the plugin directory.
         /// </summary>
-        /// <remarks>
-        ///  Note that the '~' literal is generally seen as unsafe when considering
-        ///  directory traversal exploits. However, we combine the relative path and the
-        ///  plugin directory's path before resolving the full path for comparison.
-        ///  Placing this in the "Safe" tests aims to detect when that is no longer
-        ///  the case.
-        /// </remarks>
-        /// <param name="safePath">The safe path to evaluate.</param>
+        /// <param name="dllFile">The safe path to evaluate.</param>
         [Theory]
-        [InlineData("./some1.dll")]
-        [InlineData("some3.dll")]
-        [InlineData("subdir\\..\\some4.dll")]
-        [InlineData("subdir\\..\\.\\some4.dll")]
-        [InlineData("subdir\\.\\..\\.\\some4.dll")]
-        [InlineData("subdir/../some5.dll")]
-        [InlineData("subdir/.././some6.dll")]
-        [InlineData("subdir/./.././some7.dll")]
-        [InlineData("~/some8.dll")]
-        [InlineData("....\\..\\....\\..\\some5.dll")] // "...." is a traversal risk if we attempt to replace "..".
-        public void Constructor_DiscoversSafePlugin_Status_Active(string safePath)
+        [InlineData("./some.dll")]
+        [InlineData("some.dll")]
+        [InlineData("sub/path/some.dll")]
+        public void Constructor_DiscoversSafePluginAssembly_Status_Active(string dllFile)
         {
             var manifest = new PluginManifest
             {
                 Id = Guid.NewGuid(),
                 Name = "Safe Assembly",
-                Assemblies = new string[] { safePath }
+                Assemblies = new string[] { dllFile }
             };
 
-            var tempPath = Path.Combine(_testPathRoot, "plugins-" + Path.GetRandomFileName());
-            Directory.CreateDirectory(Path.Combine(tempPath, "safe"));
+            var filename = Path.GetFileName(dllFile)!;
+            var (tempPath, pluginPath) = GetTestPaths("safe");
+
+            Directory.CreateDirectory(Path.Combine(pluginPath, dllFile.Replace(filename, string.Empty, StringComparison.OrdinalIgnoreCase)));
+            File.Create(Path.Combine(pluginPath, dllFile));
 
             var options = GetTestSerializerOptions();
-
             var data = JsonSerializer.Serialize(manifest, options);
-
             var metafilePath = Path.Combine(tempPath, "safe", "meta.json");
 
             File.WriteAllText(metafilePath, data);
@@ -94,7 +81,7 @@ namespace Jellyfin.Server.Implementations.Tests.Plugins
 
             var res = JsonSerializer.Deserialize<PluginManifest>(File.ReadAllText(metafilePath), options);
 
-            var expectedFullPath = Path.GetFullPath(Path.Combine(tempPath, "safe", safePath)).NormalizePath();
+            var expectedFullPath = Path.Combine(pluginPath, dllFile).Canonicalize();
 
             Assert.NotNull(res);
             Assert.NotEmpty(pluginManager.Plugins);
@@ -108,19 +95,23 @@ namespace Jellyfin.Server.Implementations.Tests.Plugins
         /// </summary>
         /// <remarks>
         ///  Attempts to load directories outside of the plugin should be
-        ///  constrained. However, relative traversal within the plugin directory should
-        ///  be fine. See <see cref="Constructor_DiscoversSafePlugin_Status_Active(string)"/>
-        ///  for examples of safe paths.
+        ///  constrained. Path traversal, shell expansion, and double encoding
+        ///  can be used to load unintended files.
+        ///  See <see href="https://owasp.org/www-community/attacks/Path_Traversal"/> for more.
         /// </remarks>
         /// <param name="unsafePath">The unsafe path to evaluate.</param>
         [Theory]
-        [InlineData("/some2.dll")]
-        [InlineData(".././.././../some1.dll")]
-        [InlineData("..\\.\\..\\.\\..\\some2.dll")]
-        [InlineData("../../../../../../some3.dll")]
-        [InlineData("..\\..\\..\\..\\..\\some4.dll")]
-        [InlineData("\\\\network\\resource.dll")]
-        public void Constructor_DiscoversUnsafePlugin_Status_Malfunctioned(string unsafePath)
+        [InlineData("/some.dll")] // Root path.
+        [InlineData("../some.dll")] // Simple traversal.
+        [InlineData("C:\\some.dll")] // Windows root path.
+        [InlineData("test.txt")] // Not a DLL
+        [InlineData(".././.././../some.dll")] // Traversal with current and parent
+        [InlineData("..\\.\\..\\.\\..\\some.dll")] // Windows traversal with current and parent
+        [InlineData("\\\\network\\resource.dll")] // UNC Path
+        [InlineData("https://jellyfin.org/some.dll")] // URL
+        [InlineData("....//....//some.dll")] // Path replacement risk if a single "../" replacement occurs.
+        [InlineData("~/some.dll")] // Tilde poses a shell expansion risk, but is a valid path character.
+        public void Constructor_DiscoversUnsafePluginAssembly_Status_Malfunctioned(string unsafePath)
         {
             var manifest = new PluginManifest
             {
@@ -129,13 +120,23 @@ namespace Jellyfin.Server.Implementations.Tests.Plugins
                 Assemblies = new string[] { unsafePath }
             };
 
-            var tempPath = Path.Combine(_testPathRoot, "plugins-" + Path.GetRandomFileName());
-            Directory.CreateDirectory(Path.Combine(tempPath, "unsafe"));
+            var (tempPath, pluginPath) = GetTestPaths("unsafe");
+
+            Directory.CreateDirectory(pluginPath);
+
+            var files = new string[]
+            {
+                "../other.dll",
+                "some.dll"
+            };
+
+            foreach (var file in files)
+            {
+                File.Create(Path.Combine(pluginPath, file));
+            }
 
             var options = GetTestSerializerOptions();
-
             var data = JsonSerializer.Serialize(manifest, options);
-
             var metafilePath = Path.Combine(tempPath, "unsafe", "meta.json");
 
             File.WriteAllText(metafilePath, data);
@@ -166,6 +167,14 @@ namespace Jellyfin.Server.Implementations.Tests.Plugins
             }
 
             return options;
+        }
+
+        private (string TempPath, string PluginPath) GetTestPaths(string pluginFolderName)
+        {
+            var tempPath = Path.Combine(_testPathRoot, "plugins-" + Path.GetRandomFileName());
+            var pluginPath = Path.Combine(tempPath, pluginFolderName);
+
+            return (tempPath, pluginPath);
         }
     }
 }

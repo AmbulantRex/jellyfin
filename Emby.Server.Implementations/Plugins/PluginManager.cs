@@ -429,7 +429,8 @@ namespace Emby.Server.Implementations.Plugins
                 Version = versionInfo.Version,
                 Status = status == PluginStatus.Disabled ? PluginStatus.Disabled : PluginStatus.Active, // Keep disabled state.
                 AutoUpdate = true,
-                ImagePath = imagePath
+                ImagePath = imagePath,
+                Assemblies = versionInfo.Assemblies
             };
 
             if (!await ReconcileManifest(manifest, path))
@@ -486,7 +487,7 @@ namespace Emby.Server.Implementations.Plugins
                 manifest.TargetAbi = string.IsNullOrEmpty(localManifest.TargetAbi) ? manifest.TargetAbi : localManifest.TargetAbi;
                 manifest.Timestamp = localManifest.Timestamp.Equals(default) ? manifest.Timestamp : localManifest.Timestamp;
                 manifest.ImagePath = string.IsNullOrEmpty(localManifest.ImagePath) ? manifest.ImagePath : localManifest.ImagePath;
-                manifest.Assemblies = localManifest.Assemblies;
+                manifest.Assemblies = !localManifest.Assemblies.Any() ? manifest.Assemblies : localManifest.Assemblies;
 
                 return true;
             }

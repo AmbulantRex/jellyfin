@@ -201,7 +201,7 @@ namespace Jellyfin.Server.Implementations.Tests.Plugins
             var result = JsonSerializer.Deserialize<PluginManifest>(resultBytes, _options);
 
             Assert.NotNull(result);
-            Assert.Equivalent(expectedManifest, result);
+            Assert.Equivalent(expectedManifest, result, true);
         }
 
         [Fact]
@@ -215,7 +215,6 @@ namespace Jellyfin.Server.Implementations.Tests.Plugins
                 AutoUpdate = true,
                 Status = PluginStatus.Active,
                 Owner = packageInfo.Owner,
-                Assemblies = Array.Empty<string>(),
                 Category = packageInfo.Category,
                 Description = packageInfo.Description,
                 Overview = packageInfo.Overview,
@@ -223,7 +222,8 @@ namespace Jellyfin.Server.Implementations.Tests.Plugins
                 Timestamp = DateTime.Parse(packageInfo.Versions[0].Timestamp!, CultureInfo.InvariantCulture),
                 Changelog = packageInfo.Versions[0].Changelog!,
                 Version = packageInfo.Versions[0].Version,
-                ImagePath = string.Empty
+                ImagePath = string.Empty,
+                Assemblies = packageInfo.Versions[0].Assemblies
             };
 
             var pluginManager = new PluginManager(new NullLogger<PluginManager>(), null!, null!, null!, new Version(1, 0));
@@ -235,7 +235,7 @@ namespace Jellyfin.Server.Implementations.Tests.Plugins
             var result = JsonSerializer.Deserialize<PluginManifest>(resultBytes, _options);
 
             Assert.NotNull(result);
-            Assert.Equivalent(expectedManifest, result);
+            Assert.Equivalent(expectedManifest, result, true);
         }
 
         [Fact]
